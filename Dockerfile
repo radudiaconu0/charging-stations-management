@@ -8,17 +8,6 @@ COPY docker/nginx.conf /etc/nginx/nginx.conf
 
 RUN mkdir -p /app
 COPY . /app
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libpng-dev \
-    libjpeg62-turbo-dev \
-    libfreetype6-dev \
-    libonig-dev \
-    libxml2-dev \
-    libzip-dev \
-    zip \
-    unzip \
-    curl
 
 # Clear cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
