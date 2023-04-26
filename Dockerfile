@@ -12,8 +12,8 @@ RUN docker-php-ext-install mysqli pdo pdo_mysql && docker-php-ext-enable pdo_mys
 RUN sh -c "wget http://getcomposer.org/composer.phar && chmod a+x composer.phar && mv composer.phar /usr/local/bin/composer"
 RUN cd /app && \
     /usr/local/bin/composer install --no-dev \
-RUN php /app/artisan migrate --force
+
 
 RUN chown -R www-data: /app
-
+RUN php /app/artisan migrate --force
 CMD sh /app/docker/startup.sh
