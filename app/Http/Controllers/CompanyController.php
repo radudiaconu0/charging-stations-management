@@ -30,13 +30,7 @@ class CompanyController extends Controller
         return response()->json([
             'success' => true,
             'httpCode' => 200, // 'OK'
-            'data' => CompanyResource::collection($companies->items()),
-            'meta' => [
-                'current_page' => $companies->currentPage(),
-                'last_page' => $companies->lastPage(),
-                'per_page' => $companies->perPage(),
-                'total' => $companies->total(),
-            ],
+            'data' => CompanyResource::collection($companies),
         ]);
     }
 
