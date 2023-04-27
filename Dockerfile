@@ -1,19 +1,15 @@
-FROM php:8.1-fpm-alpine
+FROM php:8.1-fpm
 
-RUN apk add --no-cache nginx wget
+WORKDIR /var/www/html
 
-RUN mkdir -p /run/nginx
+RUN apt-get update \
+    && apt-get install --quiet --yes --no-install-recommends \
+    libzip-dev \
+    unzip \
+    && docker-php-ext-install pdo pdo_mysql zip
 
-COPY docker/nginx.conf /etc/nginx/nginx.conf
+RUN pecl install redis && docker-php-ext-enable redis
 
-RUN mkdir -p /app
-COPY . /app
 
-RUN docker-php-ext-install mysqli pdo pdo_mysql && docker-php-ext-enable pdo_mysql
-RUN sh -c "wget http://getcomposer.org/composer.phar && chmod a+x composer.phar && mv composer.phar /usr/local/bin/composer"
-RUN cd /app && \
-    /usr/local/bin/composer install --no-dev
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-RUN chown -R www-data: /app
-
-CMD sh /app/docker/startup.sh
