@@ -20,4 +20,15 @@ class Station extends Model
     {
         return $this->belongsTo(Company::class);
     }
+
+    public function scopeWithinRadius(Builder $query, $latitude, $longitude, $radius)
+    {
+        $query->whereRaw("
+            (6371 * acos(cos(radians(?))
+            * cos(radians(latitude))
+            * cos(radians(longitude) - radians(?))
+            + sin(radians(?))
+            * sin(radians(latitude))))
+            < ?", [$latitude, $longitude, $latitude, $radius]);
+    }
 }

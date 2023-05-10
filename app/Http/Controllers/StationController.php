@@ -12,85 +12,23 @@ use Illuminate\Support\Facades\Cache;
 
 class StationController extends Controller
 {
-    public function index(Request $request)
+    public function index(StationRequest $request)
     {
-        $validatedData = $request->validate([
-            'latitude' => 'sometimes|required_with:longitude,radius,company_id|numeric',
-            'longitude' => 'sometimes|required_with:latitude,radius,company_id|numeric',
-            'radius' => 'sometimes|required_with:latitude,longitude,company_id|numeric|min:0',
-            'company_id' => 'sometimes|required_with:latitude,longitude,radius|exists:companies,id',
-            'page' => 'sometimes|integer|min:1',
-            'per_page' => 'sometimes|integer|min:1|max:100',
-        ]);
-
-        $page = $validatedData['page'] ?? 1;
-        $perPage = $validatedData['per_page'] ?? 15;
-
-        if (isset($validatedData['latitude'], $validatedData['longitude'], $validatedData['radius'], $validatedData['company_id'])) {
-            $latitude = $validatedData['latitude'];
-            $longitude = $validatedData['longitude'];
-            $radius = $validatedData['radius'];
-            $company_id = $validatedData['company_id'];
-
-            $company = Company::find($company_id);
-            $stations = $company->allChildStations;
-
-            $filteredStations = $stations->filter(function ($station) use ($latitude, $longitude, $radius) {
-                $stationLat = $station->latitude;
-                $stationLon = $station->longitude;
-
-                $distance = $this->haversineGreatCircleDistance($latitude, $longitude, $stationLat, $stationLon);
-
-                return $distance <= $radius;
+        $perPage = $request->get('per_page', 15);
+        if ($request->has(['latitude', 'longitude', 'radius', 'company_id'])) {
+            $stations = Cache::remember("stations_{$request->latitude}_{$request->longitude}_{$request->radius}_{$request->company_id}_{$perPage}_page_{$request->page}", 60, function () use ($request, $perPage) {
+                return Station::where('company_id', $request->company_id)
+                    ->withinRadius($request->latitude, $request->longitude, $request->radius)
+                    ->paginate($perPage)
+                    ->appends($request->all());
             });
-
-            $sortedStations = $filteredStations->sortBy(function ($station) use ($latitude, $longitude) {
-                $stationLat = $station->latitude;
-                $stationLon = $station->longitude;
-
-                return $this->haversineGreatCircleDistance($latitude, $longitude, $stationLat, $stationLon);
-            });
-
-            $stationsPaginator = Cache::remember("nearby_stations_{$company_id}_{$latitude}_{$longitude}_{$radius}_page_{$page}_per_page_{$perPage}", 60, function () use ($sortedStations, $page, $perPage) {
-                return new LengthAwarePaginator(
-                    $sortedStations->forPage($page, $perPage),
-                    $sortedStations->count(),
-                    $perPage,
-                    $page,
-                    ['path' => LengthAwarePaginator::resolveCurrentPath()]
-                );
-            });
-
-            return response()->json([
-                'success' => true,
-                'httpCode' => 200,
-                'data' => StationResource::collection($stationsPaginator)
-            ]);
         } else {
-            // Cache the paginated stations results for 60 minutes
-            return Cache::remember("stations_page_{$page}_per_page_{$perPage}", 60, function () use ($perPage) {
-                return response()->json([
-                    'success' => true,
-                    'httpCode' => 200,
-                    'data' => StationResource::collection(Station::paginate($perPage))
-                ]);
+            $stations = Cache::remember("stations_{$perPage}_page_{$request->page}", 60, function () use ($perPage) {
+                return Station::paginate($perPage);
             });
         }
 
-    }
-    private function haversineGreatCircleDistance($latitudeFrom, $longitudeFrom, $latitudeTo, $longitudeTo, $earthRadius = 6371)
-    {
-        $latFrom = deg2rad($latitudeFrom);
-        $lonFrom = deg2rad($longitudeFrom);
-        $latTo = deg2rad($latitudeTo);
-        $lonTo = deg2rad($longitudeTo);
-
-        $latDelta = $latTo - $latFrom;
-        $lonDelta = $lonTo - $lonFrom;
-
-        $angle = 2 * asin(sqrt(pow(sin($latDelta / 2), 2) + cos($latFrom) * cos($latTo) * pow(sin($lonDelta / 2), 2)));
-
-        return $angle * $earthRadius;
+        return StationResource::collection($stations);
     }
 
     public function store(StationRequest $request)
